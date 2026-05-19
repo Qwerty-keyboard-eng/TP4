@@ -5,34 +5,47 @@ import java.util.concurrent.Semaphore;
 public class Buffer {
     private final Queue<Integer> cola = new LinkedList<>();
     private final int CAPACIDAD = 5;
+    private int totalProducidos = 0; // NUEVO: Contador acumulativo
+    private InterfazGrafica ui; 
 
-    // Semáforo para espacios vacíos (arranca en CAPACIDAD porque todo está vacío)
     private Semaphore empty = new Semaphore(CAPACIDAD);
-    // Semáforo para productos listos (arranca en 0 porque no hay nada)
     private Semaphore full = new Semaphore(0);
-    // Semáforo para exclusión mutua (solo 1 a la vez toca la cola)
     private Semaphore mutex = new Semaphore(1);
 
+    public Buffer(InterfazGrafica ui) {
+        this.ui = ui;
+    }
+
     public void producir(int valor) throws InterruptedException {
-        empty.acquire(); // Decrementa espacios vacíos. Si es 0, espera.
-        mutex.acquire(); // Entra a la zona crítica
+        empty.acquire();
+        mutex.acquire();
 
         cola.add(valor);
-        System.out.println("Producido: " + valor + " | En buffer: " + cola.size());
+        totalProducidos++; // Incrementamos el global de producción
+        
+        String msg = "Producido: " + valor;
+        System.out.println(msg);
+        
+        // Pasamos el tamaño actual de la cola Y el acumulado total
+        ui.actualizar(cola.size(), totalProducidos, msg); 
 
-        mutex.release(); // Sale de la zona crítica
-        full.release();  // Incrementa productos listos. Avisa al consumidor.
+        mutex.release();
+        full.release();
     }
 
     public int consumir() throws InterruptedException {
-        full.acquire();  // Espera a que haya un producto listo.
-        mutex.acquire(); // Entra a la zona crítica
+        full.acquire();
+        mutex.acquire();
 
         int valor = cola.poll();
-        System.out.println("Consumido: " + valor + " | En buffer: " + cola.size());
+        String msg = "Consumido: " + valor;
+        System.out.println(msg);
+        
+        // Al consumir, el totalProducidos no cambia, pero lo seguimos mandando para mantener la UI al día
+        ui.actualizar(cola.size(), totalProducidos, msg); 
 
-        mutex.release(); // Sale de la zona crítica
-        empty.release(); // Incrementa espacios vacíos. Avisa al productor.
+        mutex.release();
+        empty.release();
         
         return valor;
     }
